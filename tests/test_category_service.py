@@ -1,5 +1,3 @@
-from unittest.mock import AsyncMock
-
 import pytest
 
 from learning_platform.modules.courses.application.services.category_service import (
@@ -12,9 +10,9 @@ from learning_platform.modules.courses.domain.repositories.category_repository i
 
 
 class InMemoryCategoryRepository(ICategoryRepository):
-    """In-memory test double verifying that CategoryService operates
+    """In-memory fake repository implementation for fast, isolated unit tests.
 
-    independently of SQLAlchemy / AsyncSession.
+    Runs entirely without PostgreSQL or network connections.
     """
 
     def __init__(self) -> None:
@@ -45,85 +43,183 @@ class InMemoryCategoryRepository(ICategoryRepository):
 
 
 @pytest.fixture
-def in_memory_repo():
+def fake_repo() -> InMemoryCategoryRepository:
     return InMemoryCategoryRepository()
 
 
 @pytest.fixture
-def service(in_memory_repo: InMemoryCategoryRepository):
-    return CategoryService(in_memory_repo)
+def service(fake_repo: InMemoryCategoryRepository) -> CategoryService:
+    return CategoryService(fake_repo)
+
+
+# ============================================================================
+# 1. Category Creation Tests
+# ============================================================================
 
 
 @pytest.mark.anyio
 async def test_create_category_success(service: CategoryService):
+    """Verify standard category creation with valid name and description."""
     category = await service.create_category(
-        name="Data Engineering", description="Pipelines & ETL"
+        name="Data Engineering",
+        description="Pipelines, ETL, and data warehouses",
     )
 
     assert isinstance(category, Category)
-    assert category.id is not None
+    assert category.id == 1
     assert category.name == "Data Engineering"
-    assert category.description == "Pipelines & ETL"
+    assert category.description == "Pipelines, ETL, and data warehouses"
 
 
 @pytest.mark.anyio
-async def test_create_category_duplicate_name_raises_error(
-    service: CategoryService,
-):
-    await service.create_category(name="Web Development")
+async def test_create_category_without_description(service: CategoryService):
+    """Verify category creation succeeds when description is omitted."""
+    category = await service.create_category(name="Machine Learning")
 
-    with pytest.raises(ValueError, match="already exists"):
-        await service.create_category(name="Web Development")
+    assert category.id is not None
+    assert category.name == "Machine Learning"
+    assert category.description is None
 
 
 @pytest.mark.anyio
-async def test_create_category_invalid_name_raises_error(
+async def test_create_category_strips_surrounding_whitespace(
     service: CategoryService,
 ):
-    with pytest.raises(ValueError, match="cannot be empty"):
-        await service.create_category(name="   ")
+    """Verify category names are trimmed of leading/trailing whitespace."""
+    category = await service.create_category(name="   DevOps   ")
+
+    assert category.name == "DevOps"
+
+
+# ============================================================================
+# 2. Empty Category Names Tests
+# ============================================================================
+
+
+@pytest.mark.anyio
+async def test_create_category_with_empty_string_raises_error(
+    service: CategoryService,
+):
+    """Verify empty string category names are rejected."""
+    with pytest.raises(
+        ValueError, match="Category name cannot be empty or whitespace"
+    ):
+        await service.create_category(name="")
+
+
+@pytest.mark.anyio
+async def test_create_category_with_whitespace_only_raises_error(
+    service: CategoryService,
+):
+    """Verify whitespace-only category names are rejected."""
+    with pytest.raises(
+        ValueError, match="Category name cannot be empty or whitespace"
+    ):
+        await service.create_category(name="   \t\n  ")
+
+
+# ============================================================================
+# 3. Invalid Category Names Tests
+# ============================================================================
+
+
+@pytest.mark.anyio
+async def test_create_category_with_name_exceeding_max_length_raises_error(
+    service: CategoryService,
+):
+    """Verify category names longer than 100 characters are rejected."""
+    long_name = "A" * 101
+    with pytest.raises(
+        ValueError, match="Category name cannot exceed 100 characters"
+    ):
+        await service.create_category(name=long_name)
+
+
+@pytest.mark.anyio
+async def test_create_category_with_non_string_name_raises_type_error(
+    service: CategoryService,
+):
+    """Verify non-string types for category name raise TypeError."""
+    with pytest.raises(TypeError, match="Category name must be a string"):
+        # Intentionally passing an invalid type
+        await service.create_category(name=12345)  # type: ignore[arg-type]
+
+
+@pytest.mark.anyio
+async def test_create_category_with_none_name_raises_type_error(
+    service: CategoryService,
+):
+    """Verify None for category name raises TypeError."""
+    with pytest.raises(TypeError, match="Category name must be a string"):
+        await service.create_category(name=None)  # type: ignore[arg-type]
+
+
+@pytest.mark.anyio
+async def test_create_category_with_duplicate_name_raises_error(
+    service: CategoryService,
+):
+    """Verify duplicate category names are rejected."""
+    await service.create_category(name="Cloud Computing")
+
+    with pytest.raises(
+        ValueError, match="Category with name 'Cloud Computing' already exists"
+    ):
+        await service.create_category(name="Cloud Computing")
+
+
+# ============================================================================
+# 4. Getting a Category Tests
+# ============================================================================
 
 
 @pytest.mark.anyio
 async def test_get_category_by_id_found(service: CategoryService):
-    created = await service.create_category(name="Mobile Dev")
+    """Verify retrieving an existing category by ID."""
+    created = await service.create_category(
+        name="Security", description="AppSec & Pentesting"
+    )
 
     found = await service.get_category_by_id(created.id)
 
     assert found is not None
     assert found.id == created.id
-    assert found.name == "Mobile Dev"
+    assert found.name == "Security"
+    assert found.description == "AppSec & Pentesting"
 
 
 @pytest.mark.anyio
-async def test_get_category_by_id_not_found(service: CategoryService):
+async def test_get_category_by_id_not_found_returns_none(
+    service: CategoryService,
+):
+    """Verify retrieving a non-existent category ID returns None."""
     result = await service.get_category_by_id(999)
     assert result is None
 
 
+# ============================================================================
+# 5. Listing Categories Tests
+# ============================================================================
+
+
 @pytest.mark.anyio
-async def test_list_categories(service: CategoryService):
-    await service.create_category(name="AI / ML")
-    await service.create_category(name="Security")
+async def test_list_categories_empty(service: CategoryService):
+    """Verify listing categories when none have been created returns an empty list."""
+    categories = await service.list_categories()
+    assert categories == []
+
+
+@pytest.mark.anyio
+async def test_list_categories_returns_all_items(service: CategoryService):
+    """Verify listing categories returns all saved categories."""
+    cat1 = await service.create_category(name="Frontend")
+    cat2 = await service.create_category(name="Backend")
+    cat3 = await service.create_category(name="DevOps")
 
     categories = await service.list_categories()
 
-    assert len(categories) == 2
+    assert len(categories) == 3
+    ids = [c.id for c in categories]
     names = [c.name for c in categories]
-    assert "AI / ML" in names
-    assert "Security" in names
 
-
-@pytest.mark.anyio
-async def test_service_uses_mock_repository():
-    mock_repo = AsyncMock(spec=ICategoryRepository)
-    mock_repo.get_by_name.return_value = None
-    mock_service = CategoryService(mock_repo)
-
-    result = await mock_service.create_category(
-        name="Rust", description="Systems programming"
-    )
-
-    assert result.name == "Rust"
-    mock_repo.get_by_name.assert_awaited_once_with("Rust")
-    mock_repo.add_category.assert_awaited_once()
+    assert ids == [cat1.id, cat2.id, cat3.id]
+    assert names == ["Frontend", "Backend", "DevOps"]
