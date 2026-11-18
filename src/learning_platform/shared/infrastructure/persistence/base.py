@@ -1,4 +1,4 @@
-from sqlalchemy import MetaData, String
+from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 

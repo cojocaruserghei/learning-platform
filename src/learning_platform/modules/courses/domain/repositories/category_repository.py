@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import List
 
 from learning_platform.modules.courses.domain.entities.category import Category
 
@@ -18,5 +17,5 @@ class ICategoryRepository(ABC):
     async def get_by_name(self, name:str) ->Category | None:
         pass
     @abstractmethod
-    async def list_all(self) -> List[Category]:
+    async def list_all(self) -> list[Category]:
         pass
