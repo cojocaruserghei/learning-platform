@@ -7,9 +7,6 @@ class OrmBase(DeclarativeBase):
     id: Mapped[int] = mapped_column(primary_key=True)
     metadata = MetaData()
 
-class Category(OrmBase):
-    __tablename__ = "categories"
-    name: Mapped[str] = mapped_column(String(100))
-    description: Mapped[str | None] = mapped_column(String(500))
+
 
 
