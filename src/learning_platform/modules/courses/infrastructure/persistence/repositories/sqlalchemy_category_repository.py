@@ -11,8 +11,13 @@ from learning_platform.modules.courses.infrastructure.persistence.models.categor
 
 
 class SqlAlchemyCategoryRepository(ICategoryRepository):
+    """SQLAlchemy implementation of the ICategoryRepository interface.
 
-
+    Responsible for:
+    - Managing database operations using an AsyncSession.
+    - Converting ORM models (CategoryModel) into domain entities (Category).
+    - Converting domain entities (Category) into ORM models when persisting.
+    """
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -39,6 +44,12 @@ class SqlAlchemyCategoryRepository(ICategoryRepository):
         )
 
     async def add_category(self, category: Category) -> None:
+        """Add a new category to the database.
+
+        If the category already has an ID that exists in the database, returns early.
+        Otherwise converts the entity to an ORM model, adds it to the session,
+        and flushes to retrieve generated attributes (ID).
+        """
         if category.id is not None:
             model = await self._session.get(CategoryModel, category.id)
             if model is not None:
@@ -51,28 +62,30 @@ class SqlAlchemyCategoryRepository(ICategoryRepository):
             category.id = model.id
 
     async def update_category(self, category: Category) -> None:
+        """Update an existing category's fields in the database."""
         if category.id is not None:
             model = await self._session.get(CategoryModel, category.id)
             if model is not None:
                 model.name = category.name
                 model.description = category.description
-                return
+                await self._session.flush()
 
-    async def delete(self, category_id:int) -> None:
-
-
+    async def delete(self, category_id: int) -> None:
+        """Delete a category by its ID."""
         model = await self._session.get(CategoryModel, category_id)
         if model is not None:
             await self._session.delete(model)
             await self._session.flush()
 
     async def get_by_id(self, category_id: int) -> Category | None:
+        """Retrieve a category by its ID."""
         model = await self._session.get(CategoryModel, category_id)
         if model is None:
             return None
         return self._to_entity(model)
 
     async def get_by_name(self, name: str) -> Category | None:
+        """Retrieve a category by its unique name."""
         stmt = select(CategoryModel).where(CategoryModel.name == name)
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
@@ -81,6 +94,7 @@ class SqlAlchemyCategoryRepository(ICategoryRepository):
         return self._to_entity(model)
 
     async def list_all(self) -> list[Category]:
+        """List all categories ordered by ID."""
         stmt = select(CategoryModel).order_by(CategoryModel.id)
         result = await self._session.execute(stmt)
         models = result.scalars().all()

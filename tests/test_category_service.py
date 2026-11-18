@@ -25,9 +25,13 @@ class InMemoryCategoryRepository(ICategoryRepository):
             self._next_id += 1
         self._storage[category.id] = category
 
-    async def delete(self, category: Category) -> None:
+    async def update_category(self, category: Category) -> None:
         if category.id is not None and category.id in self._storage:
-            del self._storage[category.id]
+            self._storage[category.id] = category
+
+    async def delete(self, category_id: int) -> None:
+        if category_id in self._storage:
+            del self._storage[category_id]
 
     async def get_by_id(self, category_id: int) -> Category | None:
         return self._storage.get(category_id)
@@ -141,7 +145,6 @@ async def test_create_category_with_non_string_name_raises_type_error(
 ):
     """Verify non-string types for category name raise TypeError."""
     with pytest.raises(TypeError, match="Category name must be a string"):
-        # Intentionally passing an invalid type
         await service.create_category(name=12345)  # type: ignore[arg-type]
 
 
@@ -168,7 +171,93 @@ async def test_create_category_with_duplicate_name_raises_error(
 
 
 # ============================================================================
-# 4. Getting a Category Tests
+# 4. Update Category Tests
+# ============================================================================
+
+
+@pytest.mark.anyio
+async def test_update_category_success(service: CategoryService):
+    """Verify updating category name and description."""
+    created = await service.create_category(
+        name="Old Name", description="Old Desc"
+    )
+
+    updated = await service.update_category(
+        category_id=created.id,
+        name="New Name",
+        description="New Desc",
+    )
+
+    assert updated is not None
+    assert updated.id == created.id
+    assert updated.name == "New Name"
+    assert updated.description == "New Desc"
+
+    # Verify persisted state
+    found = await service.get_category_by_id(created.id)
+    assert found is not None
+    assert found.name == "New Name"
+    assert found.description == "New Desc"
+
+
+@pytest.mark.anyio
+async def test_update_category_not_found_returns_none(
+    service: CategoryService,
+):
+    """Verify updating a non-existent category returns None."""
+    result = await service.update_category(
+        category_id=999,
+        name="Doesn't Exist",
+    )
+    assert result is None
+
+
+@pytest.mark.anyio
+async def test_update_category_duplicate_name_raises_error(
+    service: CategoryService,
+):
+    """Verify updating a category to a name that already belongs to another category raises ValueError."""
+    await service.create_category(name="Python")
+    cat2 = await service.create_category(name="Java")
+
+    with pytest.raises(
+        ValueError, match="Category with name 'Python' already exists"
+    ):
+        await service.update_category(category_id=cat2.id, name="Python")
+
+
+@pytest.mark.anyio
+async def test_update_category_same_name_does_not_raise(
+    service: CategoryService,
+):
+    """Verify updating description without changing name does not trigger uniqueness conflict."""
+    cat = await service.create_category(name="Go", description="Original desc")
+
+    updated = await service.update_category(
+        category_id=cat.id,
+        name="Go",
+        description="Updated desc",
+    )
+
+    assert updated is not None
+    assert updated.description == "Updated desc"
+
+
+@pytest.mark.anyio
+async def test_update_category_invalid_name_raises_error(
+    service: CategoryService,
+):
+    """Verify updating category with empty name triggers domain validation error."""
+    cat = await service.create_category(name="Valid")
+
+    with pytest.raises(
+        ValueError, match="Category name cannot be empty or whitespace"
+    ):
+        await service.update_category(category_id=cat.id, name="")
+
+
+# ============================================================================
+# 5. Getting a Category Tests
 # ============================================================================
 
 
@@ -197,7 +286,7 @@ async def test_get_category_by_id_not_found_returns_none(
 
 
 # ============================================================================
-# 5. Listing Categories Tests
+# 6. Listing Categories Tests
 # ============================================================================
 
 

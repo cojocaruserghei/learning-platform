@@ -160,7 +160,7 @@ async def test_add_new_category(
 
 
 @pytest.mark.anyio
-async def test_add_existing_category_updates_model(
+async def test_update_category_updates_model(
     repository: SqlAlchemyCategoryRepository, mock_session: AsyncMock
 ):
     existing_model = CategoryModel(id=1, name="Old Name", description="Old Desc")
@@ -168,11 +168,26 @@ async def test_add_existing_category_updates_model(
 
     updated_entity = Category(name="New Name", description="New Desc", id=1)
 
-    await repository.add_category(updated_entity)
+    await repository.update_category(updated_entity)
 
     mock_session.get.assert_awaited_once_with(CategoryModel, 1)
     assert existing_model.name == "New Name"
     assert existing_model.description == "New Desc"
+    mock_session.flush.assert_awaited_once()
+
+
+@pytest.mark.anyio
+async def test_add_category_with_existing_id_does_not_re_add(
+    repository: SqlAlchemyCategoryRepository, mock_session: AsyncMock
+):
+    existing_model = CategoryModel(id=1, name="Old Name", description="Old Desc")
+    mock_session.get.return_value = existing_model
+
+    entity = Category(name="Old Name", description="Old Desc", id=1)
+
+    await repository.add_category(entity)
+
+    mock_session.get.assert_awaited_once_with(CategoryModel, 1)
     mock_session.add.assert_not_called()
 
 
