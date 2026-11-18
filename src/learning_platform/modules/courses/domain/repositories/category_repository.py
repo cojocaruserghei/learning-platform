@@ -5,10 +5,10 @@ from learning_platform.modules.courses.domain.entities.category import Category
 
 class ICategoryRepository(ABC):
     @abstractmethod
-    async def add_category(self, category) -> None:
+    async def add_category(self, category:Category) -> None:
         pass
     @abstractmethod
-    async def delete(self, category) -> None:
+    async def delete(self, category_id:int) -> None:
         pass
     @abstractmethod
     async def get_by_id(self, category_id:int) ->Category | None:

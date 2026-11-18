@@ -183,22 +183,10 @@ async def test_delete_existing_category(
     existing_model = CategoryModel(id=7, name="To Delete", description=None)
     mock_session.get.return_value = existing_model
 
-    entity = Category(name="To Delete", id=7)
 
-    await repository.delete(entity)
+    await repository.delete(7)
 
     mock_session.get.assert_awaited_once_with(CategoryModel, 7)
     mock_session.delete.assert_awaited_once_with(existing_model)
     mock_session.flush.assert_awaited_once()
 
-
-@pytest.mark.anyio
-async def test_delete_category_without_id_is_noop(
-    repository: SqlAlchemyCategoryRepository, mock_session: AsyncMock
-):
-    entity = Category(name="Unsaved")
-
-    await repository.delete(entity)
-
-    mock_session.get.assert_not_called()
-    mock_session.delete.assert_not_called()

@@ -50,11 +50,10 @@ class SqlAlchemyCategoryRepository(ICategoryRepository):
         if model.id is not None:
             category.id = model.id
 
-    async def delete(self, category: Category) -> None:
-        if category.id is None:
-            return
+    async def delete(self, category_id:int) -> None:
 
-        model = await self._session.get(CategoryModel, category.id)
+
+        model = await self._session.get(CategoryModel, category_id)
         if model is not None:
             await self._session.delete(model)
             await self._session.flush()
