@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # 2. Store both in app.state
     app.state.db_engine = engine
     app.state.session_factory = session_factory
-    app.state.settings = get_settings()
+    app.state.settings = settings
 
     try:
         yield

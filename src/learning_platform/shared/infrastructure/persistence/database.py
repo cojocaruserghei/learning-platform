@@ -9,7 +9,7 @@ def create_db_connection_string(settings: AppSettings) -> URL:
         drivername="postgresql+asyncpg",
         username=settings.postgres_user,
         password=settings.postgres_password,  # Automatically URL-encoded
-        host="localhost",
+        host=settings.postgres_host,
         port=int(settings.postgres_port),
         database=settings.postgres_db,
     )

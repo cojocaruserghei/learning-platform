@@ -14,6 +14,7 @@ class AppSettings(BaseSettings):
     postgres_user: str = "admin"
     postgres_password: str = "admin"
     postgres_port: str = "5432"
+    postgres_host: str = "localhost"
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore"
