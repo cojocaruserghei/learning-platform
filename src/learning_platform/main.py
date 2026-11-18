@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # 2. Store both in app.state
     app.state.db_engine = engine
     app.state.session_factory = session_factory
-    app.state.settings = settings
+    app.state.settings = get_settings()
 
     try:
         yield
@@ -43,6 +43,5 @@ app = FastAPI(
     debug=settings.debug,
     lifespan=lifespan,
 )
-app.state.settings = settings
 
 app.include_router(health.router)
