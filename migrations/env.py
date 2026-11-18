@@ -6,6 +6,9 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from learning_platform.config import get_settings
+from learning_platform.modules.courses.infrastructure.persistence.models.category_model import (
+    CategoryModel,  # noqa: F401
+)
 from learning_platform.shared.infrastructure.persistence.base import OrmBase
 from learning_platform.shared.infrastructure.persistence.database import (
     create_db_connection_string,
