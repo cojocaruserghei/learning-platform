@@ -4,13 +4,6 @@ from typing import Annotated
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from learning_platform.shared.infrastructure.persistence.database import engine
-
-async_session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
-    bind=engine,
-    expire_on_commit=False,
-)
-
 
 async def get_db_session(request: Request) -> AsyncGenerator[AsyncSession]:
     """Dependency that manages the database session lifecycle per HTTP request.
@@ -24,9 +17,6 @@ async def get_db_session(request: Request) -> AsyncGenerator[AsyncSession]:
         request.app.state.session_factory
     )
 
-    # `async with session_factory() as session:` enters the session and
-    # guarantees `session.close()` is awaited in its __aexit__, rolling back
-    # any uncommitted transaction and releasing the connection back to the pool.
     async with session_factory() as session:
         yield session
 

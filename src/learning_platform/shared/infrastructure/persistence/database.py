@@ -1,11 +1,10 @@
 from sqlalchemy import URL
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
-from learning_platform.config import get_settings
+from learning_platform.config import AppSettings, get_settings
 
-settings = get_settings()
 
-def create_db_connection_string() -> URL:
+def create_db_connection_string(settings: AppSettings) -> URL:
     return URL.create(
         drivername="postgresql+asyncpg",
         username=settings.postgres_user,
@@ -16,12 +15,16 @@ def create_db_connection_string() -> URL:
     )
 
 
-engine = create_async_engine(
-    create_db_connection_string(),
-    pool_size=5,
-    max_overflow=10,
-    pool_timeout=30,
-    pool_recycle=3600,
-    pool_pre_ping=True,
-    echo=settings.debug,
-)
+def create_db_engine(settings: AppSettings | None = None) -> AsyncEngine:
+    if settings is None:
+        settings = get_settings()
+
+    return create_async_engine(
+        create_db_connection_string(settings),
+        pool_size=5,
+        max_overflow=10,
+        pool_timeout=30,
+        pool_recycle=3600,
+        pool_pre_ping=True,
+        echo=settings.debug,
+    )

@@ -1,5 +1,7 @@
-from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from learning_platform.shared.infrastructure.persistence.database import engine
 
-async_session_factory = async_sessionmaker(bind=engine, expire_on_commit=False)
+def create_session_factory(
+    engine: AsyncEngine,
+) -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(bind=engine, expire_on_commit=False)
