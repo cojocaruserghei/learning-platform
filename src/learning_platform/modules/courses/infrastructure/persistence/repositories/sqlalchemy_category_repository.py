@@ -12,6 +12,8 @@ from learning_platform.modules.courses.infrastructure.persistence.models.categor
 
 class SqlAlchemyCategoryRepository(ICategoryRepository):
 
+
+
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
@@ -40,8 +42,6 @@ class SqlAlchemyCategoryRepository(ICategoryRepository):
         if category.id is not None:
             model = await self._session.get(CategoryModel, category.id)
             if model is not None:
-                model.name = category.name
-                model.description = category.description
                 return
 
         model = self._to_model(category)
@@ -49,6 +49,14 @@ class SqlAlchemyCategoryRepository(ICategoryRepository):
         await self._session.flush()
         if model.id is not None:
             category.id = model.id
+
+    async def update_category(self, category: Category) -> None:
+        if category.id is not None:
+            model = await self._session.get(CategoryModel, category.id)
+            if model is not None:
+                model.name = category.name
+                model.description = category.description
+                return
 
     async def delete(self, category_id:int) -> None:
 

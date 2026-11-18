@@ -8,6 +8,9 @@ class ICategoryRepository(ABC):
     async def add_category(self, category:Category) -> None:
         pass
     @abstractmethod
+    async def update_category(self, category:Category) -> None:
+        pass
+    @abstractmethod
     async def delete(self, category_id:int) -> None:
         pass
     @abstractmethod
