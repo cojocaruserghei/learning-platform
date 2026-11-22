@@ -1,4 +1,5 @@
 from types import TracebackType
+from typing import Self
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,10 +20,10 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self._session = session
         self._categories = SqlAlchemyCategoryRepository(self._session)
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> Self:
         return self
 
-    async def __aexit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None):
+    async def __aexit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None) -> None:
         if exc_type is not None:
             await self.rollback()
         else:
@@ -33,7 +34,11 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         return self._categories
 
     async def commit(self) -> None:
-        await self._session.commit()
+        try:
+            await self._session.commit()
+        except Exception:
+            await self._session.rollback()
+            raise
 
     async def rollback(self) -> None:
         await self._session.rollback()
