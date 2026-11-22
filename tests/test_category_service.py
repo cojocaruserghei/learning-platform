@@ -7,6 +7,9 @@ from learning_platform.modules.courses.domain.entities.category import Category
 from learning_platform.modules.courses.domain.repositories.category_repository import (
     ICategoryRepository,
 )
+from learning_platform.modules.courses.domain.repositories.unit_of_work import (
+    IUnitOfWork,
+)
 
 
 class InMemoryCategoryRepository(ICategoryRepository):
@@ -46,14 +49,39 @@ class InMemoryCategoryRepository(ICategoryRepository):
         return list(self._storage.values())
 
 
+class FakeUnitOfWork(IUnitOfWork):
+    def __init__(self, categories: InMemoryCategoryRepository) -> None:
+        self._categories = categories
+        self.commit_count = 0
+        self.rollback_count = 0
+        self.commit_error: Exception | None = None
+
+    @property
+    def categories(self) -> ICategoryRepository:
+        return self._categories
+
+    async def commit(self) -> None:
+        self.commit_count += 1
+        if self.commit_error is not None:
+            raise self.commit_error
+
+    async def rollback(self) -> None:
+        self.rollback_count += 1
+
+
 @pytest.fixture
 def fake_repo() -> InMemoryCategoryRepository:
     return InMemoryCategoryRepository()
 
 
 @pytest.fixture
-def service(fake_repo: InMemoryCategoryRepository) -> CategoryService:
-    return CategoryService(fake_repo)
+def fake_uow(fake_repo: InMemoryCategoryRepository) -> FakeUnitOfWork:
+    return FakeUnitOfWork(fake_repo)
+
+
+@pytest.fixture
+def service(fake_uow: FakeUnitOfWork) -> CategoryService:
+    return CategoryService(fake_uow)
 
 
 # ============================================================================
@@ -62,7 +90,9 @@ def service(fake_repo: InMemoryCategoryRepository) -> CategoryService:
 
 
 @pytest.mark.anyio
-async def test_create_category_success(service: CategoryService):
+async def test_create_category_success(
+    service: CategoryService, fake_uow: FakeUnitOfWork
+):
     """Verify standard category creation with valid name and description."""
     category = await service.create_category(
         name="Data Engineering",
@@ -73,6 +103,8 @@ async def test_create_category_success(service: CategoryService):
     assert category.id == 1
     assert category.name == "Data Engineering"
     assert category.description == "Pipelines, ETL, and data warehouses"
+    assert fake_uow.commit_count == 1
+    assert fake_uow.rollback_count == 0
 
 
 @pytest.mark.anyio
@@ -176,7 +208,9 @@ async def test_create_category_with_duplicate_name_raises_error(
 
 
 @pytest.mark.anyio
-async def test_update_category_success(service: CategoryService):
+async def test_update_category_success(
+    service: CategoryService, fake_uow: FakeUnitOfWork
+):
     """Verify updating category name and description."""
     created = await service.create_category(
         name="Old Name", description="Old Desc"
@@ -198,6 +232,89 @@ async def test_update_category_success(service: CategoryService):
     assert found is not None
     assert found.name == "New Name"
     assert found.description == "New Desc"
+    assert fake_uow.commit_count == 2
+    assert fake_uow.rollback_count == 0
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("operation", ["create", "update"])
+async def test_write_repository_failure_rolls_back_and_propagates(
+    operation: str,
+    service: CategoryService,
+    fake_repo: InMemoryCategoryRepository,
+    fake_uow: FakeUnitOfWork,
+):
+    if operation == "update":
+        category = await service.create_category(name="Existing")
+        fake_uow.commit_count = 0
+
+    failure = RuntimeError("repository failure")
+
+    async def fail_write(_category: Category) -> None:
+        raise failure
+
+    method_name = "add_category" if operation == "create" else "update_category"
+    setattr(fake_repo, method_name, fail_write)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        if operation == "create":
+            await service.create_category(name="New")
+        else:
+            await service.update_category(category.id, name="Updated")
+
+    assert exc_info.value is failure
+    assert fake_uow.commit_count == 0
+    assert fake_uow.rollback_count == 1
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("operation", ["create", "update"])
+async def test_commit_failure_rolls_back_and_propagates(
+    operation: str,
+    service: CategoryService,
+    fake_uow: FakeUnitOfWork,
+):
+    if operation == "update":
+        category = await service.create_category(name="Existing")
+        fake_uow.commit_count = 0
+
+    failure = RuntimeError("commit failure")
+    fake_uow.commit_error = failure
+
+    with pytest.raises(RuntimeError) as exc_info:
+        if operation == "create":
+            await service.create_category(name="New")
+        else:
+            await service.update_category(category.id, name="Updated")
+
+    assert exc_info.value is failure
+    assert fake_uow.commit_count == 1
+    assert fake_uow.rollback_count == 1
+
+
+@pytest.mark.anyio
+async def test_non_writing_paths_do_not_commit_or_roll_back(
+    service: CategoryService, fake_uow: FakeUnitOfWork
+):
+    with pytest.raises(ValueError):
+        await service.create_category(name="")
+    assert fake_uow.commit_count == 0
+    assert fake_uow.rollback_count == 0
+
+    first = await service.create_category(name="Python")
+    second = await service.create_category(name="Java")
+    with pytest.raises(ValueError, match="already exists"):
+        await service.create_category(name="Python")
+    with pytest.raises(ValueError, match="already exists"):
+        await service.update_category(second.id, name="Python")
+    with pytest.raises(ValueError):
+        await service.update_category(first.id, name="")
+
+    assert await service.update_category(999, name="Missing") is None
+    assert await service.get_category_by_id(first.id) is first
+    assert len(await service.list_categories()) == 2
+    assert fake_uow.commit_count == 2
+    assert fake_uow.rollback_count == 0
 
 
 @pytest.mark.anyio
