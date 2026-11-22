@@ -19,12 +19,8 @@ class CategoryService:
         if existing is not None:
             raise ValueError(f"Category with name '{category.name}' already exists.")
 
-        try:
+        async with self._uow:
             await self._uow.categories.add_category(category)
-            await self._uow.commit()
-        except Exception:
-            await self._uow.rollback()
-            raise
         return category
 
     async def update_category(
@@ -48,12 +44,8 @@ class CategoryService:
         # Update domain entity (triggers validation on setters)
         category.name = name
         category.description = description
-        try:
+        async with self._uow:
             await self._uow.categories.update_category(category)
-            await self._uow.commit()
-        except Exception:
-            await self._uow.rollback()
-            raise
         return category
 
     async def get_category_by_id(self, category_id: int) -> Category | None:
