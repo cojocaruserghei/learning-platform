@@ -20,7 +20,11 @@ class CategoryService:
             raise ValueError(f"Category with name '{category.name}' already exists.")
 
         await self._uow.categories.add_category(category)
-        await self._uow.commit()
+        try:
+            await self._uow.commit()
+        except Exception:
+            await self._uow.rollback()
+            raise
         return category
 
     async def update_category(
@@ -46,7 +50,11 @@ class CategoryService:
         category.description = description
 
         await self._uow.categories.update_category(category)
-        await self._uow.commit()
+        try:
+            await self._uow.commit()
+        except Exception:
+            await self._uow.rollback()
+            raise
         return category
 
     async def get_category_by_id(self, category_id: int) -> Category | None:

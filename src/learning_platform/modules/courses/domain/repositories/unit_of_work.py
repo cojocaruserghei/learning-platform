@@ -5,7 +5,7 @@ from learning_platform.modules.courses.domain.repositories.category_repository i
 )
 
 
-class IUnitOfWork (ABC):
+class IUnitOfWork(ABC):
     @property
     @abstractmethod
     def categories(self) -> ICategoryRepository:
