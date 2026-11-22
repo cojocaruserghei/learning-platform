@@ -12,6 +12,14 @@ class IUnitOfWork(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def __aenter__(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    async def __aexit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None):
+        raise NotImplementedError
+
+    @abstractmethod
     async def commit(self) -> None:
         raise NotImplementedError
 

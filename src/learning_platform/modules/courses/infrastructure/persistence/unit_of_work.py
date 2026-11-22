@@ -1,3 +1,5 @@
+from types import TracebackType
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from learning_platform.modules.courses.domain.repositories.category_repository import (
@@ -16,6 +18,15 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
     def __init__(self, session: AsyncSession):
         self._session = session
         self._categories = SqlAlchemyCategoryRepository(self._session)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None):
+        if exc_type is not None:
+            await self.rollback()
+        else:
+            await self.commit()
 
     @property
     def categories(self) -> ICategoryRepository:
