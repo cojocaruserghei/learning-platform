@@ -19,8 +19,8 @@ class CategoryService:
         if existing is not None:
             raise ValueError(f"Category with name '{category.name}' already exists.")
 
-        await self._uow.categories.add_category(category)
         try:
+            await self._uow.categories.add_category(category)
             await self._uow.commit()
         except Exception:
             await self._uow.rollback()
@@ -48,9 +48,8 @@ class CategoryService:
         # Update domain entity (triggers validation on setters)
         category.name = name
         category.description = description
-
-        await self._uow.categories.update_category(category)
         try:
+            await self._uow.categories.update_category(category)
             await self._uow.commit()
         except Exception:
             await self._uow.rollback()
